@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Новый пост{{ group }}{% endblock %}
+{% block header %}Создание нового поста{% endblock %}
+{% block content %}
+
+
+<div class="row justify-content-center">
+    <div class="col-md-8 p-5">
+        <div class="card">
+            {% if update %}
+            <div class="card-header">Редактирование</div>
+            {% else %}
+            <div class="card-header">Новый пост</div>
+            {% endif %}
+
+            <div class="card-body">
+                <form method="post" class="form-control-feedback" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    {% if update %}
+                    <button type="submit">Изменить Пост</button>
+                    {% else %}
+                    <button type="submit">Создать пост</button>
+                    {% endif %}
+                </form>
+            </div> <!-- card body -->
+        </div> <!-- card -->
+    </div> <!-- col -->
+</div> <!-- row -->
+
+{% endblock %}
+
