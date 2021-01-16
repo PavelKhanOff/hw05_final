@@ -2,7 +2,7 @@
 
 {% if user.is_authenticated %}
 <div class="card my-4">
-    {% if current_action == True %}
+    {% if page == True %}
     <form method="post" action="{% url 'add_comment' username=author post_id=post.id %}" ">
     {% else %}
     <form method="post"">

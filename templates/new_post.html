@@ -7,7 +7,7 @@
 <div class="row justify-content-center">
     <div class="col-md-8 p-5">
         <div class="card">
-            {% if update %}
+            {% if post %}
             <div class="card-header">Редактирование</div>
             {% else %}
             <div class="card-header">Новый пост</div>
@@ -17,7 +17,7 @@
                 <form method="post" class="form-control-feedback" enctype="multipart/form-data">
                     {% csrf_token %}
                     {{ form.as_p }}
-                    {% if update %}
+                    {% if post %}
                     <button type="submit">Изменить Пост</button>
                     {% else %}
                     <button type="submit">Создать пост</button>

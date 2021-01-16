@@ -1,9 +1,6 @@
-from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from posts.models import Group, Post
-
-User = get_user_model()
+from posts.models import Group, Post, User
 
 
 class PostModelTest(TestCase):
@@ -18,13 +15,13 @@ class PostModelTest(TestCase):
         cls.post = Post.objects.create(
             text='Тестовый супер текст',
             author=User.objects.create(username='testuser'),
-            group=Group.objects.get(id=cls.group.id),
+            group=cls.group,
 
         )
 
     def test_text_verbose(self):
         """verbose_name поля text и group совпадает с ожидаемым."""
-        post = PostModelTest.post
+        post = self.post
         field_verboses = {
             'text': 'Твой лучший текст!',
             'group': 'Группа!'
@@ -38,8 +35,8 @@ class PostModelTest(TestCase):
         """help_text поля text и group совпадает с ожидаемым."""
         post = PostModelTest.post
         field_help_text = {
-            'text': 'Пиши без ошибок плз',
-            'group': 'Выбери группу!'
+            'text': 'Пишите без ошибок',
+            'group': 'Пожалуйста, выберите группу.'
         }
         for value, expected in field_help_text.items():
             with self.subTest(value=value):

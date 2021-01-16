@@ -3,15 +3,24 @@ import tempfile
 
 from django import forms
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
-from django.test.utils import override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from posts.models import Follow, Group, Post
+from posts.models import Follow, Group, Post, User
 
-User = get_user_model()
+INDEX_URL = reverse('index')
+GROUP_URL = reverse('group', kwargs={'slug': 'testslug'})
+PROFILE_URL = reverse('profile', kwargs={'username': 'pavel'})
+FOLLOW_INDEX_URL = reverse('follow_index')
+PROFILE_FOLLOW_URL = reverse('profile_follow', kwargs={
+            'username': 'testuserforsubs'})
+PROFILE_FOLLOW_PAVEL_URL = reverse('profile_follow', kwargs={
+            'username': 'pavel'})
+PROFILE_UNFOLLOW_URL = reverse('profile_unfollow',
+                               kwargs={'username': 'pavel'})
+LOGIN_URL_TESTUSER_URL = '/auth/login/?next=/TestUser/2/edit/'
 
 
 class PostViewsTest(TestCase):
@@ -24,8 +33,7 @@ class PostViewsTest(TestCase):
                      b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
                      b'\x00\x00\x00\x2C\x00\x00\x00\x00'
                      b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-                     b'\x0A\x00\x3B'
-                     )
+                     b'\x0A\x00\x3B')
         uploaded = SimpleUploadedFile(
             name='small.gif',
             content=small_gif,
@@ -33,16 +41,25 @@ class PostViewsTest(TestCase):
         )
         cls.post = Post.objects.create(
             text='Тестовый супер текст',
-            author=User.objects.create(username='testauthor'),
+            author=User.objects.create(username='pavel'),
             group=Group.objects.create(title='testgroup',
                                        description='testdesc',
                                        slug='testslug'),
             image=uploaded
             )
-        cls.group = Group.objects.get(slug='testslug')
+        cls.group = cls.post.group
         Group.objects.create(title='secondgroup',
                              description='newgroupdesc',
                              slug='secondtestslug')
+        cls.POST_URL = reverse('post', kwargs={
+            'username': cls.post.author.username, 'post_id': cls.post.id})
+        cls.NEW_POST_URL = reverse('new_post')
+        cls.POST_EDIT_URL = reverse('post_edit', kwargs={
+            'username': cls.post.author.username,
+            'post_id': cls.post.id})
+        cls.ADD_COMMENT_URL = reverse('add_comment', kwargs={
+            'username': cls.post.author.username,
+            'post_id': cls.post.id})
 
     @classmethod
     def tearDownClass(cls):
@@ -51,107 +68,46 @@ class PostViewsTest(TestCase):
 
     def setUp(self):
         self.guest_client = Client()
-        self.user = User.objects.create_user(username='testuser')
+        self.user = User.objects.create_user(username='TestUser')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
-    def test_pages_correct_template(self):
-        """URL-адреса использует правильные шаблоны"""
-        templates_pages_names = {
-            'index.html': reverse('index'),
-            'group.html': reverse('group', kwargs={'slug': 'testslug'}),
-            'new_post.html': reverse('new_post'),
-        }
-
-        for template, reverse_name in templates_pages_names.items():
-            with self.subTest(reverse_name=reverse_name):
-                response = self.authorized_client.get(reverse_name)
-                self.assertTemplateUsed(response, template)
-
-    def test_home_page_group_page_correct_context_authorized_user(self):
-        """Тест правильного контекста для home_page
-        и group_page авторизированным пользователем"""
-
-        right_context = {
-            PostViewsTest.post: [reverse('index'),
-                                 reverse('group', kwargs={'slug': 'testslug'})]
-        }
-        for context, reverse_name in right_context.items():
-            with self.subTest(reverse_name=reverse_name):
-                response = self.authorized_client.get(reverse_name[0])
-                actual_post = response.context.get('page')[0]
-                self.assertEqual(actual_post, context)
-                response_group = self.authorized_client.get(reverse_name[1])
-                actual_post_group = response_group.context.get('page')[0]
-                self.assertEqual(actual_post_group, context)
-
-    def test_home_page_group_page_correct_context_unauthorized_user(self):
-        """Тест правильного контекста для home_page
-                и group_page неавторизированным пользователем"""
-
-        right_context = {
-            PostViewsTest.post: [reverse('index'),
-                                 reverse('group',
-                                         kwargs={'slug': self.group.slug})]
-        }
-        for context, reverse_name in right_context.items():
-            with self.subTest(reverse_name=reverse_name):
-                response = self.guest_client.get(reverse_name[0])
-                actual_post = response.context.get('page')[0]
-                self.assertEqual(actual_post, context)
-                response = self.guest_client.get(reverse_name[1])
-                actual_post = response.context.get('page')[0]
-                self.assertEqual(actual_post, context)
+    def test_all_pages_contain_correct_context(self):
+        @override_settings(
+            CACHES={'default': {'BACKEND': 'django.core.cache.backends.dummy.'
+                                           'DummyCache'}})
+        # после использования cache тест INDEX_URL упал,
+        # я применил override_settings, если так делать нельзя,
+        # прошу объяснить почему.
+        def test():
+            pages = [
+                [INDEX_URL, self.guest_client, self.post],
+                [GROUP_URL, self.guest_client, self.post],
+                [PROFILE_URL, self.guest_client, self.post],
+                [self.POST_URL, self.guest_client, self.post],
+                [INDEX_URL, self.authorized_client, self.post],
+                [GROUP_URL, self.authorized_client, self.post],
+                [PROFILE_URL, self.authorized_client, self.post],
+                [self.POST_URL, self.authorized_client, self.post],
+            ]
+            for url in pages:
+                with self.subTest():
+                    response = url[1].get(url[0])
+                    actual_post = response.context.get('post')
+                    self.assertEqual(actual_post, url[2])
 
     def test_new_post_and_post_edit_pages_correct_context(self):
         """Страница создания нового поста и
         редактирования поста использует правильный context"""
         response = self.authorized_client.get(reverse('new_post'))
-        form_fields = {
-            'group': forms.fields.ChoiceField,
-            'text': forms.fields.CharField,
-        }
-
-        for value, expected in form_fields.items():
-            with self.subTest(value=value):
-                form_field = response.context.get('form').fields.get(value)
-                self.assertIsInstance(form_field, expected)
-
-    def test_profile_page_correct_context_authorized_user(self):
-        """Страница профиля использует правильный context
-        для авторизированного пользователя"""
-        response = self.authorized_client.get(
-            reverse('profile', kwargs={'username': self.post.author.username}))
-        expected_post = PostViewsTest.post
-        actual_post = response.context.get('page')[0]
-        self.assertEqual(actual_post, expected_post)
-
-    def test_profile_page_correct_context_unauthorized_user(self):
-        """Страница профиля использует правильный context
-        для авторизированного пользователя"""
-        response = self.guest_client.get(
-            reverse('profile', kwargs={'username': self.post.author.username}))
-        expected_post = PostViewsTest.post
-        actual_post = response.context.get('page')[0]
-        self.assertEqual(actual_post, expected_post)
-
-    def test_post_id_page_correct_context_authorized_user(self):
-        """Страница поста использует правильный context
-        для авторизированного пользователя"""
-        response = self.authorized_client.get(reverse('post', kwargs={
-            'username': self.post.author.username, 'post_id': self.post.id}))
-        expected_post = PostViewsTest.post
-        actual_post = response.context.get('post')
-        self.assertEqual(actual_post, expected_post)
-
-    def test_post_id_page_correct_context_unauthorized_user(self):
-        """Страница поста использует правильный context
-        для неавторизированного пользователя"""
-        response = self.guest_client.get(reverse('post', kwargs={
-            'username': self.post.author.username, 'post_id': self.post.id}))
-        expected_post = PostViewsTest.post
-        actual_post = response.context.get('post')
-        self.assertEqual(actual_post, expected_post)
+        form_fields = [
+            ['group', forms.fields.ChoiceField],
+            ['text', forms.fields.CharField],
+        ]
+        for field in form_fields:
+            with self.subTest():
+                form_field = response.context.get('form').fields.get(field[0])
+                self.assertIsInstance(form_field, field[1])
 
     def test_first_page_contains_ten_posts(self):
         """Страница содержит 10 записей"""
@@ -161,7 +117,7 @@ class PostViewsTest(TestCase):
                 author=User.objects.create(
                     username=f'{self.post.author.username}{post}'),
             )
-        response = self.authorized_client.get(reverse('index'))
+        response = self.authorized_client.get(INDEX_URL)
         self.assertEqual(len(response.context.get('page')), 10)
 
     def test_second_page_contains_ten_posts(self):
@@ -175,39 +131,38 @@ class PostViewsTest(TestCase):
         response = self.authorized_client.get(reverse('index') + '?page=2')
         self.assertEqual(len(response.context.get('page')), 4)
 
-    def test_image_index_profile_post_group(self):
-        """Проверка что при выводе поста с картинкой,
-        картинка есть в context"""
-        response = self.authorized_client.get(reverse('index'))
-        expected_post = PostViewsTest.post
-        actual_post = response.context.get('page')[0]
-        self.assertEqual(actual_post, expected_post)
-
-    def test_cache(self):
-        """Тестирование кэша"""
-        post_before = self.guest_client.get('/')
-        Post.objects.create(text='текст проверки кэша',
-                            author=User.objects.get(username=self.post.author))
-        post_after = self.guest_client.get('/')
-        self.assertNotEqual(
-            post_before.content,
-            post_after.content,
-            'Контент совпадает'
+    def test_index_page_uses_cache(self):
+        """Главная страница использует кэш."""
+        response_before = self.guest_client.get(INDEX_URL)
+        self.test_cache_post = Post.objects.create(
+            text='Пост для теста кэша',
+            author=self.user,
+            group=self.group
+        )
+        response_after = self.guest_client.get(INDEX_URL)
+        self.assertEqual(
+            response_before.content,
+            response_after.content
+        )
+        cache.clear()
+        response_after_clear = self.guest_client.get(
+            INDEX_URL
+        )
+        self.assertEqual(
+            response_after_clear.context['page'][0],
+            self.test_cache_post
         )
 
     def test_new_post_exists_subscribed_person(self):
         """Тестирование того, что новая запись пользователя появится
          в ленте тех кто на него подписан"""
         new_post = Post.objects.create(
-                text='Новый супер текст',
-                author=User.objects.create(
-                    username='testuserforsubs'),
-            )
-        self.authorized_client.get(
-            reverse('profile_follow',
-                    kwargs={'username': new_post.author.username}))
-
-        response = self.authorized_client.get(reverse('follow_index'))
+            text='Новый супер текст',
+            author=User.objects.create(
+                username='testuserforsubs'),
+        )
+        self.authorized_client.get(PROFILE_FOLLOW_URL)
+        response = self.authorized_client.get(FOLLOW_INDEX_URL)
         expected_post = new_post
         actual_post = response.context.get('page')[0]
         self.assertEqual(actual_post, expected_post)
@@ -216,24 +171,15 @@ class PostViewsTest(TestCase):
         """Тест на то, что только авторизированный
                         пользователь может подписываться"""
         before_sub = Follow.objects.all().count()
-        self.authorized_client.get(
-            reverse('profile_follow',
-                    kwargs={'username': User.objects.get(
-                        username='testauthor')}))
+        self.authorized_client.get(PROFILE_FOLLOW_PAVEL_URL)
         after_sub = Follow.objects.all().count()
         self.assertNotEqual(before_sub, after_sub)
 
     def test_authorized_user_can_unsubscribe(self):
         """Тест на то, что только авторизированный
                         пользователь может отписываться"""
-        self.authorized_client.get(
-            reverse('profile_follow',
-                    kwargs={'username': User.objects.get(
-                        username='testauthor')}))
+        self.authorized_client.get(PROFILE_FOLLOW_PAVEL_URL)
         after_sub = Follow.objects.all().count()
-        self.authorized_client.get(
-            reverse('profile_unfollow',
-                    kwargs={'username': User.objects.get(
-                        username='testauthor')}))
+        self.authorized_client.get(PROFILE_UNFOLLOW_URL)
         after_unsub = Follow.objects.all().count()
         self.assertNotEqual(after_sub, after_unsub)

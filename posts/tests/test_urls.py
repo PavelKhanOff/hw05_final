@@ -1,10 +1,18 @@
-from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Group, Post
+from posts.models import Group, Post, User
 
-User = get_user_model()
+INDEX_URL = reverse('index')
+GROUP_URL = reverse('group', kwargs={'slug': 'testslug'})
+PROFILE_URL = reverse('profile', kwargs={'username': 'pavel'})
+FOLLOW_INDEX_URL = reverse('follow_index')
+PROFILE_FOLLOW_URL = reverse('profile_follow', kwargs={
+            'username': 'pavel'})
+PROFILE_UNFOLLOW_URL = reverse('profile_unfollow',
+                               kwargs={'username': 'pavel'})
+LOGIN_URL_TESTUSER_URL = '/auth/login/?next=/TestUser/2/edit/'
+NOT_EXISTING_PAGE_URL = '/not/existing/page'
 
 
 class PostUrlTests(TestCase):
@@ -16,146 +24,93 @@ class PostUrlTests(TestCase):
             title='testgroup', description='testdesc', slug='testslug')
         cls.post_pavel = Post.objects.create(
             text='Тестовый супер текст',
-            author=User.objects.get(username=cls.author_pavel.username),
-            group=Group.objects.get(slug=cls.group.slug),
-        )
+            author=cls.author_pavel,
+            group=cls.group,)
         cls.author_testuser = User.objects.create_user(username='TestUser')
         cls.post_testuser = Post.objects.create(
             text='Тестовый супер текст2',
-            author=User.objects.get(username=cls.author_testuser.username),
+            author=cls.author_testuser,
         )
+        cls.POST_URL = reverse('post',
+                               kwargs={'username': cls.author_pavel.username,
+                                       'post_id': cls.post_pavel.id})
+        cls.NEW_POST_URL = reverse('new_post')
+        cls.POST_EDIT_URL = reverse('post_edit', kwargs={
+                                    'username': cls.author_pavel.username,
+                                    'post_id': cls.post_pavel.id})
+        cls.POST_EDIT_AUTHOR_URL = reverse('post_edit', kwargs={
+            'username': cls.author_testuser.username,
+            'post_id': cls.post_testuser.id})
+        cls.ADD_COMMENT_URL = reverse('add_comment', kwargs={
+            'username': cls.author_pavel.username,
+            'post_id': cls.post_pavel.id,
+        })
 
     def setUp(self):
         self.guest_client = Client()
-        self.user = User.objects.get(username=self.author_testuser.username)
+        self.user = self.author_testuser
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
-        self.test_addresses = [
-            reverse('index'),
-            reverse('group', kwargs={'slug': self.group.slug}),
-            reverse('new_post'),
-            reverse('profile', kwargs={
-                'username': self.author_pavel.username}),
-            reverse('post', kwargs={'username': self.author_pavel.username,
-                                    'post_id': self.post_pavel.id}),
-            reverse('post_edit', kwargs={
-                                    'username': self.author_pavel.username,
-                                    'post_id': self.post_pavel.id}
-                    )
+    def test_status_code_for_all_users_and_pages(self):
+        url_names = [
+            [INDEX_URL, self.guest_client, 200, 1],
+            [GROUP_URL, self.guest_client, 200, 2],
+            [PROFILE_URL, self.guest_client, 200, 3],
+            [FOLLOW_INDEX_URL, self.guest_client, 302, 4],
+            [PROFILE_FOLLOW_URL, self.guest_client, 302, 5],
+            [PROFILE_UNFOLLOW_URL, self.guest_client, 302, 6],
+            [self.POST_URL, self.guest_client, 200, 7],
+            [self.NEW_POST_URL, self.guest_client, 302, 8],
+            [self.POST_EDIT_URL, self.guest_client, 302, 9],
+            [self.ADD_COMMENT_URL, self.guest_client, 302, 10],
+            [NOT_EXISTING_PAGE_URL, self.guest_client, 404, 21],
+            [INDEX_URL, self.authorized_client, 200, 11],
+            [GROUP_URL, self.authorized_client, 200, 12],
+            [PROFILE_URL, self.authorized_client, 200, 13],
+            [FOLLOW_INDEX_URL, self.authorized_client, 200, 14],
+            [PROFILE_FOLLOW_URL, self.authorized_client, 302, 15],
+            [PROFILE_UNFOLLOW_URL, self.authorized_client, 302, 16],
+            [self.POST_URL, self.authorized_client, 200, 17],
+            [self.NEW_POST_URL, self.authorized_client, 200, 18],
+            [self.POST_EDIT_URL, self.authorized_client, 302, 19],
+            [self.POST_EDIT_AUTHOR_URL, self.authorized_client, 200, 20],
+            [self.ADD_COMMENT_URL, self.authorized_client, 200, 21],
+            [NOT_EXISTING_PAGE_URL, self.authorized_client, 404, 21],
         ]
-
-    def test_for_all_users_except_post_edit(self):
-        """Тест status_code для всех страниц кроме post_edit"""
-        addresses = {
-            self.test_addresses[0]: 200,
-            self.test_addresses[1]: 200,
-            self.test_addresses[3]: 200,
-            self.test_addresses[4]: 200,
-            self.test_addresses[5]: 302,
-        }
-        for address, expected_status_code in addresses.items():
-            with self.subTest(value=address):
-                current_status_code = \
-                    self.authorized_client.get(address).status_code
-                self.assertEqual(current_status_code, expected_status_code)
-
-                current_status_code = \
-                    self.guest_client.get(address).status_code
-                self.assertEqual(current_status_code, expected_status_code)
-
-    def test_for_post_edit(self):
-        """Тест status_code для post_edit"""
-
-        status_code = self.authorized_client.get(self.test_addresses[2]) \
-            .status_code
-        self.assertEqual(status_code, 200)
-
-        status_code_unauthorized = self.guest_client.get(
-            self.test_addresses[2]).status_code
-        self.assertEqual(status_code_unauthorized, 302)
-
-    def test_profile_post_edit_by_creator(self):
-        """Проверка доступности адреса '/<username>/<post_id>/edit/'
-        для авторизированного пользователя(автора поста)."""
-        response = self.authorized_client.get(
-            reverse('post_edit',
-                    kwargs={'username': self.author_testuser.username,
-                            'post_id': self.post_testuser.id}))
-        self.assertEqual(response.status_code, 200)
+        for url_name in url_names:
+            with self.subTest():
+                current_status_code = url_name[1].get(url_name[0]).status_code
+                self.assertEqual(current_status_code, url_name[2])
 
     def test_urls_correct_templates(self):
-        """Проверка шаблона для адреса '/', '/group/testslug/', '/new'."""
-        templates_correct = {
-            'index.html': reverse('index'),
-            'group.html': reverse('group', kwargs={'slug': self.group.slug}),
-            'new_post.html': reverse('new_post')
-        }
-
-        for template, url_name in templates_correct.items():
+        """Проверка шаблона для адреса '/', '/group/testslug/', '/new',
+         /username/post_id/edit."""
+        correct_templates_and_adresses = [
+            [INDEX_URL, 'index.html'],
+            [GROUP_URL, 'group.html'],
+            [self.NEW_POST_URL, 'new_post.html'],
+            [self.POST_EDIT_AUTHOR_URL, 'new_post.html'],
+        ]
+        for url_name in correct_templates_and_adresses:
             with self.subTest():
-                response = self.authorized_client.get(url_name)
-                self.assertTemplateUsed(response, template)
+                response = self.authorized_client.get(url_name[0])
+                self.assertTemplateUsed(response, url_name[1])
 
-    def test_post_edit_correct_template(self):
-        # Я пытался создать список в templates_correct для этого теста,
-        # но каждый раз натыкался на проблему
-        # 'No templates used to render the response', не смог ее решить:(
-        """Проверка шаблона для адреса '/<username>/<post_id>/edit/'"""
-        response = self.authorized_client.get(
-            reverse('post_edit',
-                    kwargs={'username': self.author_testuser.username,
-                            'post_id': self.post_testuser.id}))
-        self.assertTemplateUsed(response, 'new_post.html')
-
-    def test_post_edit_correct_redirect_unauthorized(self):
-        """Проверка редиректа для адреса '/<username>/<post_id>/edit/',
-         для неавторизированного пользователя"""
-        response = self.guest_client.get(
-            reverse('post_edit',
-                    kwargs={'username': self.author_testuser.username,
-                            'post_id': self.post_testuser.id}), follow=True)
-        self.assertRedirects(response, '/auth/login/?next=/TestUser/2/edit/')
-
-    def test_post_edit_correct_redirect_authorized_not_author(self):
-        """Проверка редиректа для адреса '/<username>/<post_id>/edit/',
-         для авторизированного пользователя(не автора)"""
-        response = self.authorized_client.get(
-            reverse('post_edit',
-                    kwargs={'username': self.author_pavel.username,
-                            'post_id': self.post_pavel.id}), follow=True)
-        self.assertRedirects(response, '/pavel/1/')
-
-    def test_404_error_when_page_doesnt_exist(self):
-        """Проверка что если пользователь перейдет на несуществующую страницу,
-         то сервер возвратит код 404"""
-        response = self.authorized_client.get('/not/existing/page')
-        self.assertEqual(response.status_code, 404)
-
-    def test_authorized_user_can_comment_posts(self):
-        """Тест на то, что только авторизирвоанный
-        пользователь может комментировать посты"""
-        response = self.authorized_client.get(reverse('add_comment', kwargs={
-            'username': self.post_pavel.author.username,
-            'post_id': self.post_pavel.id}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_unauthorized_user_cant_comment_posts(self):
-        """Тест на то, что только авторизированный
-        пользователь может комментировать посты"""
-        response = self.guest_client.get(reverse('add_comment', kwargs={
-            'username': self.post_pavel.author.username,
-            'post_id': self.post_pavel.id}))
-        self.assertEqual(response.status_code, 302)
+    def test_post_edit_correct_redirect(self):
+        correct_pathes_to_redirect = [
+            [self.POST_EDIT_AUTHOR_URL, self.guest_client,
+             LOGIN_URL_TESTUSER_URL],
+            [self.POST_EDIT_URL, self.authorized_client, self.POST_URL]
+        ]
+        for url in correct_pathes_to_redirect:
+            response = url[1].get(url[0])
+            self.assertRedirects(response, url[2])
 
     def test_authorized_user_can_subscribe_and_unsubscribe(self):
         """Тест на то, что только авторизированный
                 пользователь может подписываться"""
-        response = self.authorized_client.get(
-            reverse('profile_follow', kwargs={
-                'username': self.author_testuser.username}))
+        response = self.authorized_client.get(PROFILE_FOLLOW_URL)
         self.assertEqual(response.status_code, 302)
-        response = self.authorized_client.get(
-            reverse('profile_unfollow',
-                    kwargs={'username': self.author_testuser.username}))
+        response = self.authorized_client.get(PROFILE_UNFOLLOW_URL)
         self.assertEqual(response.status_code, 302)

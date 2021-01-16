@@ -6,7 +6,7 @@ User = get_user_model()
 
 class Group(models.Model):
     title = models.CharField(max_length=200)
-    slug = models   .SlugField(max_length=20, unique=True, default='slug')
+    slug = models.SlugField(max_length=20, unique=True, default='slug')
     description = models.TextField()
 
     def __str__(self):
@@ -16,7 +16,7 @@ class Group(models.Model):
 class Post(models.Model):
     title = models.CharField(max_length=200, default='title_post')
     text = models.TextField(verbose_name='Твой лучший текст!',
-                            help_text='Пиши без ошибок плз')
+                            help_text='Пишите без ошибок')
     pub_date = models.DateTimeField(verbose_name='date published',
                                     auto_now_add=True)
     author = models.ForeignKey(
@@ -25,9 +25,9 @@ class Post(models.Model):
     )
     group = models.ForeignKey(
         Group, verbose_name='Группа!',
-        help_text='Выбери группу!',
+        help_text='Пожалуйста, выберите группу.',
         on_delete=models.SET_NULL, blank=True,
-        null=True, related_name='group_posts'
+        null=True, related_name='posts'
     )
     image = models.ImageField(upload_to='posts/', blank=True, null=True,
                               verbose_name='Изображение',
@@ -43,9 +43,9 @@ class Post(models.Model):
 
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE,
-                             related_name='comment')
+                             related_name='comments')
     author = models.ForeignKey(User, on_delete=models.CASCADE,
-                               related_name='comment')
+                               related_name='comments')
     text = models.TextField(verbose_name='Комментарий',
                             help_text='Напиши свой комментарий')
     created = models.DateTimeField(verbose_name='Comment date',
@@ -55,7 +55,7 @@ class Comment(models.Model):
         ordering = ['-created']
 
     def __str__(self):
-        return self.text
+        return self.text[:15]
 
 
 class Follow(models.Model):

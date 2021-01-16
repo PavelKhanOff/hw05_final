@@ -1,10 +1,10 @@
 <nav class="navbar navbar-light" style="background-color: #FDEAA8; font-family:Georgia;">
-    <a class="navbar-brand" href="/" style="color:#000000; font-size:35px"><span style="color:#C5007F">Ya</span>tube</a>
+    <a class="navbar-brand" href="{% url 'index' %}" style="color:#000000; font-size:35px"><span style="color:#C5007F">Ya</span>tube</a>
 
 
     <nav class="my-2 my-md-0 mr-md-3" style="font-family:Georgia">
         {% if user.is_authenticated %}
-        Пользователь: {{ user.username }}.
+        Пользователь: <a href="{% url 'profile' user.username %}">{{ user.username }}</a>
         <a class="p-2 text-dark" href="{% url 'new_post' %}">Новый пост</a>
         <a class="p-2 text-dark" href="{% url 'password_change' %}">Изменить пароль</a>
         <a class="p-2 text-dark" href="{% url 'logout' %}">Выйти</a>
