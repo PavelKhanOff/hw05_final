@@ -3,41 +3,50 @@ from django.urls import reverse
 
 from posts.models import Group, Post, User
 
+GROUP_TITLE = 'testgroup'
+GROUP_DESCRIPTION = 'testdesc'
+GROUP_SLUG = 'testslug'
+USERNAME = 'pavel'
+USERNAME_TESTUSER = 'TestUser'
+POST_PAVEL_TEXT = 'Тестовый супер текст'
+POST_TESTUSER_TEXT = 'Тестовый супер текст2'
 INDEX_URL = reverse('index')
-GROUP_URL = reverse('group', kwargs={'slug': 'testslug'})
-PROFILE_URL = reverse('profile', kwargs={'username': 'pavel'})
+GROUP_URL = reverse('group', args={GROUP_SLUG})
+PROFILE_URL = reverse('profile', args={USERNAME})
 FOLLOW_INDEX_URL = reverse('follow_index')
-PROFILE_FOLLOW_URL = reverse('profile_follow', kwargs={
-            'username': 'pavel'})
-PROFILE_UNFOLLOW_URL = reverse('profile_unfollow',
-                               kwargs={'username': 'pavel'})
-LOGIN_URL_TESTUSER_URL = '/auth/login/?next=/TestUser/2/edit/'
+PROFILE_FOLLOW_URL = reverse('profile_follow', args=[USERNAME])
+PROFILE_UNFOLLOW_URL = reverse('profile_unfollow', args=[USERNAME])
+LOGIN_URL = '/auth/login/'
 NOT_EXISTING_PAGE_URL = '/not/existing/page'
+NEW_POST_URL = reverse('new_post')
+LOGIN_URL_NEW_URL = f'{LOGIN_URL}?next={NEW_POST_URL}'
+LOGIN_URL_FOLLOW_URL = f'{LOGIN_URL}?next={PROFILE_FOLLOW_URL}'
+LOGIN_URL_UNFOLLOW_URL = f'{LOGIN_URL}?next={PROFILE_UNFOLLOW_URL}'
 
 
 class PostUrlTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.author_pavel = User.objects.create_user(username='pavel')
+        cls.author_pavel = User.objects.create_user(username=USERNAME)
         cls.group = Group.objects.create(
-            title='testgroup', description='testdesc', slug='testslug')
+            title=GROUP_TITLE, description=GROUP_DESCRIPTION, slug=GROUP_SLUG)
         cls.post_pavel = Post.objects.create(
-            text='Тестовый супер текст',
+            text=POST_PAVEL_TEXT,
             author=cls.author_pavel,
             group=cls.group,)
-        cls.author_testuser = User.objects.create_user(username='TestUser')
+        cls.author_testuser = User.objects.create_user(
+            username=USERNAME_TESTUSER)
         cls.post_testuser = Post.objects.create(
-            text='Тестовый супер текст2',
+            text=POST_TESTUSER_TEXT,
             author=cls.author_testuser,
         )
         cls.POST_URL = reverse('post',
                                kwargs={'username': cls.author_pavel.username,
                                        'post_id': cls.post_pavel.id})
-        cls.NEW_POST_URL = reverse('new_post')
-        cls.POST_EDIT_URL = reverse('post_edit', kwargs={
-                                    'username': cls.author_pavel.username,
-                                    'post_id': cls.post_pavel.id})
+        cls.POST_EDIT_URL = reverse(
+            'post_edit', kwargs={'username': cls.author_pavel.username,
+                                 'post_id': cls.post_pavel.id})
         cls.POST_EDIT_AUTHOR_URL = reverse('post_edit', kwargs={
             'username': cls.author_testuser.username,
             'post_id': cls.post_testuser.id})
@@ -45,43 +54,38 @@ class PostUrlTests(TestCase):
             'username': cls.author_pavel.username,
             'post_id': cls.post_pavel.id,
         })
-
-    def setUp(self):
-        self.guest_client = Client()
-        self.user = self.author_testuser
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
+        cls.LOGIN_URL_TESTUSER_URL = (LOGIN_URL + '?next=' +
+                                      cls.POST_EDIT_AUTHOR_URL)
+        cls.LOGIN_URL_COMMENT_URL = f'{LOGIN_URL}?next={cls.ADD_COMMENT_URL}'
+        cls.guest_client = Client()
+        cls.user = cls.author_testuser
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
 
     def test_status_code_for_all_users_and_pages(self):
         url_names = [
-            [INDEX_URL, self.guest_client, 200, 1],
-            [GROUP_URL, self.guest_client, 200, 2],
-            [PROFILE_URL, self.guest_client, 200, 3],
-            [FOLLOW_INDEX_URL, self.guest_client, 302, 4],
-            [PROFILE_FOLLOW_URL, self.guest_client, 302, 5],
-            [PROFILE_UNFOLLOW_URL, self.guest_client, 302, 6],
-            [self.POST_URL, self.guest_client, 200, 7],
-            [self.NEW_POST_URL, self.guest_client, 302, 8],
-            [self.POST_EDIT_URL, self.guest_client, 302, 9],
-            [self.ADD_COMMENT_URL, self.guest_client, 302, 10],
-            [NOT_EXISTING_PAGE_URL, self.guest_client, 404, 21],
-            [INDEX_URL, self.authorized_client, 200, 11],
-            [GROUP_URL, self.authorized_client, 200, 12],
-            [PROFILE_URL, self.authorized_client, 200, 13],
-            [FOLLOW_INDEX_URL, self.authorized_client, 200, 14],
-            [PROFILE_FOLLOW_URL, self.authorized_client, 302, 15],
-            [PROFILE_UNFOLLOW_URL, self.authorized_client, 302, 16],
-            [self.POST_URL, self.authorized_client, 200, 17],
-            [self.NEW_POST_URL, self.authorized_client, 200, 18],
-            [self.POST_EDIT_URL, self.authorized_client, 302, 19],
-            [self.POST_EDIT_AUTHOR_URL, self.authorized_client, 200, 20],
-            [self.ADD_COMMENT_URL, self.authorized_client, 200, 21],
-            [NOT_EXISTING_PAGE_URL, self.authorized_client, 404, 21],
+            [INDEX_URL, self.guest_client, 200],
+            [GROUP_URL, self.guest_client, 200],
+            [PROFILE_URL, self.guest_client, 200],
+            [FOLLOW_INDEX_URL, self.guest_client, 302],
+            [PROFILE_FOLLOW_URL, self.guest_client, 302],
+            [PROFILE_UNFOLLOW_URL, self.guest_client, 302],
+            [self.POST_URL, self.guest_client, 200],
+            [NEW_POST_URL, self.guest_client, 302],
+            [self.POST_EDIT_URL, self.guest_client, 302],
+            [self.ADD_COMMENT_URL, self.guest_client, 302],
+            [NOT_EXISTING_PAGE_URL, self.guest_client, 404],
+            [PROFILE_FOLLOW_URL, self.authorized_client, 302],
+            [PROFILE_UNFOLLOW_URL, self.authorized_client, 302],
+            [NEW_POST_URL, self.authorized_client, 200],
+            [self.POST_EDIT_URL, self.authorized_client, 302],
+            [self.POST_EDIT_AUTHOR_URL, self.authorized_client, 200],
+            [self.ADD_COMMENT_URL, self.authorized_client, 200],
         ]
-        for url_name in url_names:
+        for url, client, expected_status_code in url_names:
             with self.subTest():
-                current_status_code = url_name[1].get(url_name[0]).status_code
-                self.assertEqual(current_status_code, url_name[2])
+                current_status_code = client.get(url).status_code
+                self.assertEqual(current_status_code, expected_status_code)
 
     def test_urls_correct_templates(self):
         """Проверка шаблона для адреса '/', '/group/testslug/', '/new',
@@ -89,28 +93,29 @@ class PostUrlTests(TestCase):
         correct_templates_and_adresses = [
             [INDEX_URL, 'index.html'],
             [GROUP_URL, 'group.html'],
-            [self.NEW_POST_URL, 'new_post.html'],
+            [NEW_POST_URL, 'new_post.html'],
             [self.POST_EDIT_AUTHOR_URL, 'new_post.html'],
+            [FOLLOW_INDEX_URL, 'follow.html'],
+            [self.ADD_COMMENT_URL, 'comments.html'],
+            [self.POST_URL, 'post.html'],
+            [PROFILE_URL, 'profile.html'],
         ]
-        for url_name in correct_templates_and_adresses:
+        for url, template in correct_templates_and_adresses:
             with self.subTest():
-                response = self.authorized_client.get(url_name[0])
-                self.assertTemplateUsed(response, url_name[1])
+                response = self.authorized_client.get(url)
+                self.assertTemplateUsed(response, template)
 
     def test_post_edit_correct_redirect(self):
         correct_pathes_to_redirect = [
             [self.POST_EDIT_AUTHOR_URL, self.guest_client,
-             LOGIN_URL_TESTUSER_URL],
-            [self.POST_EDIT_URL, self.authorized_client, self.POST_URL]
-        ]
-        for url in correct_pathes_to_redirect:
-            response = url[1].get(url[0])
-            self.assertRedirects(response, url[2])
-
-    def test_authorized_user_can_subscribe_and_unsubscribe(self):
-        """Тест на то, что только авторизированный
-                пользователь может подписываться"""
-        response = self.authorized_client.get(PROFILE_FOLLOW_URL)
-        self.assertEqual(response.status_code, 302)
-        response = self.authorized_client.get(PROFILE_UNFOLLOW_URL)
-        self.assertEqual(response.status_code, 302)
+             self.LOGIN_URL_TESTUSER_URL],
+            [self.POST_EDIT_URL, self.authorized_client, self.POST_URL],
+            [NEW_POST_URL, self.guest_client, LOGIN_URL_NEW_URL],
+            [self.ADD_COMMENT_URL, self.guest_client,
+             self.LOGIN_URL_COMMENT_URL],
+            [PROFILE_FOLLOW_URL, self.guest_client, LOGIN_URL_FOLLOW_URL],
+            [PROFILE_UNFOLLOW_URL, self.guest_client, LOGIN_URL_UNFOLLOW_URL]
+            ]
+        for url, client, redirect in correct_pathes_to_redirect:
+            response = client.get(url)
+            self.assertRedirects(response, redirect)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %} Последние обновления {% endblock %}
+{% block title %} Последние обновления профиля {% endblock %}
 
 {% block content %}
 <main role="main" class="container">
@@ -46,7 +46,7 @@
         <div class="col-md-9">
             <div class="container">
                 {% include "menu.html" with index=True %}
-                <h1> Последние обновления на сайте</h1>
+                <h1> Последние обновления профиля </h1>
                 {% for post in page %}
                     {% include "post_item.html" with post=post %}
                 {% endfor %}

@@ -25,14 +25,13 @@ class Post(models.Model):
     )
     group = models.ForeignKey(
         Group, verbose_name='Группа!',
-        help_text='Пожалуйста, выберите группу.',
+        help_text='Группа, в которой опубликуется ваш пост.',
         on_delete=models.SET_NULL, blank=True,
         null=True, related_name='posts'
     )
     image = models.ImageField(upload_to='posts/', blank=True, null=True,
                               verbose_name='Изображение',
-                              help_text='Добавьте изображение '
-                                        'для своего поста!')
+                              help_text='Изображение вашего поста.')
 
     class Meta:
         ordering = ['-pub_date']
