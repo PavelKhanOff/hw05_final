@@ -13,10 +13,14 @@ USERNAME = 'pavel'
 GROUP_SLUG = 'testslug'
 GROUP_TITLE = 'Тестовая группа'
 GROUP_DESCRIPTION = "Описание тестовой группы"
+GROUP2_SLUG = 'testslug2'
+GROUP2_TITLE = 'Тестовая группа2'
+GROUP2_DESCRIPTION = "Описание тестовой группы2"
 POST_TEXT = "Тестовый текст должен быть очень длинным"
+LOGIN = '/auth/login/'
 NEW_POST_URL = reverse("new_post")
 INDEX_URL = reverse("index")
-LOGIN_URL = '/auth/login/'
+LOGIN_URL = LOGIN
 NEW_POST_REDIRECT_URL = LOGIN_URL+'?next='+NEW_POST_URL
 SMALL_GIF = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
              b'\x01\x00\x80\x00\x00\x00\x00\x00'
@@ -45,6 +49,11 @@ class TaskCreateFormTests(TestCase):
             title=GROUP_TITLE,
             description=GROUP_DESCRIPTION,
             )
+        cls.group2 = Group.objects.create(
+            slug=GROUP2_SLUG,
+            title=GROUP2_TITLE,
+            description=GROUP2_DESCRIPTION,
+        )
         cls.post = Post.objects.create(
             author=cls.user_pavel,
             text=POST_TEXT,
@@ -52,13 +61,12 @@ class TaskCreateFormTests(TestCase):
             image=uploaded
         )
         cls.POST_EDIT_URL = (reverse("post_edit",
-                                     kwargs={"username": cls.user_pavel,
-                                             "post_id": cls.group.id}))
-        cls.POST_URL = reverse('post', kwargs={
-            'username': cls.user_pavel.username, 'post_id': cls.post.id})
-        cls.ADD_COMMENT_URL = reverse('add_comment', kwargs={
-            'username': cls.user_pavel.username,
-            'post_id': cls.post.id})
+                                     args=[cls.user_pavel, cls.post.id]))
+        cls.POST_URL = reverse('post', args=[cls.user_pavel.username,
+                                             cls.post.id])
+        cls.ADD_COMMENT_URL = reverse('add_comment',
+                                      args=[cls.user_pavel.username,
+                                            cls.post.id])
         cls.POST_REDIRECT_URL = LOGIN_URL + '?next=' + cls.POST_EDIT_URL
 
     @classmethod
@@ -69,70 +77,51 @@ class TaskCreateFormTests(TestCase):
     def test_create_post_authorized(self):
         """Валидная форма создает запись в Post
         авторизированным пользователя"""
-        post_count = Post.objects.count()
+        uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
         form_data = {
             "text": "Текст новой записи",
-            "group": "",
+            "group": self.group2.id,
+            "image": uploaded
         }
         response = self.authorized_client.post(
             NEW_POST_URL,
             data=form_data,
             follow=True
         )
+        post = Post.objects.exclude(id=self.post.id)[0]
+        self.assertEqual(post.text, form_data['text'])
+        self.assertEqual(post.group.id, form_data['group'])
         self.assertRedirects(response, INDEX_URL)
-        self.assertEqual(Post.objects.count(), post_count+1)
-
-    def test_create_post_not_authorized(self):
-        """Валидная форма не создает запись в Post
-        неавторизированным пользователя"""
-        post_count = Post.objects.count()
-        form_data = {
-            "text": "Текст новой записи",
-            "group": "",
-        }
-        response = self.guest_client.post(
-            NEW_POST_URL,
-            data=form_data,
-            follow=True
-        )
-        self.assertRedirects(response, NEW_POST_REDIRECT_URL)
-        self.assertEqual(Post.objects.count(), post_count)
+    # Принял решение удалить проверку на то,
+    # что неавторизированные пользователи не могут создавать посты и их
+    # редактировать, потому что мы это проверяем в url, их редиректит
 
     def test_edit_post_authorized(self):
         """Редактируется нужный пост авторизированным пользователя"""
-        post_count = Post.objects.count()
+        uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
         form_data = {
-            "text": "Измененный текст новой записи",
-            "group": self.group.id,
+            "text": "Текст новой записи",
+            "group": self.group2.id,
+            "image": uploaded
         }
         response = self.authorized_client.post(self.POST_EDIT_URL,
-                                               data=form_data,
-                                               follow=True)
+                                               data=form_data, follow=True)
+        post_editing = response.context['post']
+        self.assertEqual(post_editing.text, form_data['text'])
+        self.assertEqual(post_editing.group.id, form_data['group'])
         self.assertRedirects(response, self.POST_URL)
-        self.assertEqual(Post.objects.count(), post_count)
-        self.assertTrue(Post.objects.filter
-                        (text="Измененный текст новой записи").exists())
-
-    def test_edit_post_not_authorized(self):
-        """Редактируется нужный пост авторизированным пользователя"""
-        post_count = Post.objects.count()
-        form_data = {
-            "text": "Измененный текст новой записи",
-            "group": self.group.id,
-        }
-        response = self.guest_client.post(self.POST_EDIT_URL,
-                                          data=form_data,
-                                          follow=True)
-        self.assertRedirects(response, self.POST_REDIRECT_URL)
-        self.assertEqual(Post.objects.count(), post_count)
-        self.assertFalse(Post.objects.filter(
-            text="Измененный текст новой записи").exists())
 
     def test_comment_post(self):
         """Авторизированный пользователь может комментировать посты"""
         form_data = {
-            'post': self.post,
-            'author': self.user_pavel,
             'text': 'тестовый комментарий'
         }
         response = self.authorized_client.post(self.ADD_COMMENT_URL,
@@ -141,7 +130,6 @@ class TaskCreateFormTests(TestCase):
                                                )
         comment = Comment.objects.first()
         self.assertEqual(comment.text, form_data['text'])
-        self.assertEqual(comment.author, form_data['author'])
         self.assertRedirects(response, self.POST_URL)
         self.assertEqual(self.post.comments.count(), 1)
         self.assertEqual(comment.post, self.post)

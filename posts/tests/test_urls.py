@@ -10,14 +10,16 @@ USERNAME = 'pavel'
 USERNAME_TESTUSER = 'TestUser'
 POST_PAVEL_TEXT = 'Тестовый супер текст'
 POST_TESTUSER_TEXT = 'Тестовый супер текст2'
+LOGIN = '/auth/login/'
+NOT_EXISTING_PAGE = '/not/existing/page'
 INDEX_URL = reverse('index')
-GROUP_URL = reverse('group', args={GROUP_SLUG})
-PROFILE_URL = reverse('profile', args={USERNAME})
+GROUP_URL = reverse('group', args=[GROUP_SLUG])
+PROFILE_URL = reverse('profile', args=[USERNAME])
 FOLLOW_INDEX_URL = reverse('follow_index')
 PROFILE_FOLLOW_URL = reverse('profile_follow', args=[USERNAME])
 PROFILE_UNFOLLOW_URL = reverse('profile_unfollow', args=[USERNAME])
-LOGIN_URL = '/auth/login/'
-NOT_EXISTING_PAGE_URL = '/not/existing/page'
+LOGIN_URL = LOGIN
+NOT_EXISTING_PAGE_URL = NOT_EXISTING_PAGE
 NEW_POST_URL = reverse('new_post')
 LOGIN_URL_NEW_URL = f'{LOGIN_URL}?next={NEW_POST_URL}'
 LOGIN_URL_FOLLOW_URL = f'{LOGIN_URL}?next={PROFILE_FOLLOW_URL}'
@@ -42,18 +44,16 @@ class PostUrlTests(TestCase):
             author=cls.author_testuser,
         )
         cls.POST_URL = reverse('post',
-                               kwargs={'username': cls.author_pavel.username,
-                                       'post_id': cls.post_pavel.id})
+                               args=[cls.author_pavel.username,
+                                     cls.post_pavel.id])
         cls.POST_EDIT_URL = reverse(
-            'post_edit', kwargs={'username': cls.author_pavel.username,
-                                 'post_id': cls.post_pavel.id})
-        cls.POST_EDIT_AUTHOR_URL = reverse('post_edit', kwargs={
-            'username': cls.author_testuser.username,
-            'post_id': cls.post_testuser.id})
-        cls.ADD_COMMENT_URL = reverse('add_comment', kwargs={
-            'username': cls.author_pavel.username,
-            'post_id': cls.post_pavel.id,
-        })
+            'post_edit', args=[cls.author_pavel.username, cls.post_pavel.id])
+        cls.POST_EDIT_AUTHOR_URL = reverse('post_edit',
+                                           args=[cls.author_testuser.username,
+                                                 cls.post_testuser.id])
+        cls.ADD_COMMENT_URL = reverse('add_comment',
+                                      args=[cls.author_pavel.username,
+                                            cls.post_pavel.id])
         cls.LOGIN_URL_TESTUSER_URL = (LOGIN_URL + '?next=' +
                                       cls.POST_EDIT_AUTHOR_URL)
         cls.LOGIN_URL_COMMENT_URL = f'{LOGIN_URL}?next={cls.ADD_COMMENT_URL}'
@@ -88,8 +88,7 @@ class PostUrlTests(TestCase):
                 self.assertEqual(current_status_code, expected_status_code)
 
     def test_urls_correct_templates(self):
-        """Проверка шаблона для адреса '/', '/group/testslug/', '/new',
-         /username/post_id/edit."""
+        """Проверка шаблона для адресов"""
         correct_templates_and_adresses = [
             [INDEX_URL, 'index.html'],
             [GROUP_URL, 'group.html'],
@@ -102,8 +101,8 @@ class PostUrlTests(TestCase):
         ]
         for url, template in correct_templates_and_adresses:
             with self.subTest():
-                response = self.authorized_client.get(url)
-                self.assertTemplateUsed(response, template)
+                self.assertTemplateUsed(self.authorized_client.get(url),
+                                        template)
 
     def test_post_edit_correct_redirect(self):
         correct_pathes_to_redirect = [
@@ -114,8 +113,7 @@ class PostUrlTests(TestCase):
             [self.ADD_COMMENT_URL, self.guest_client,
              self.LOGIN_URL_COMMENT_URL],
             [PROFILE_FOLLOW_URL, self.guest_client, LOGIN_URL_FOLLOW_URL],
-            [PROFILE_UNFOLLOW_URL, self.guest_client, LOGIN_URL_UNFOLLOW_URL]
+            [PROFILE_UNFOLLOW_URL, self.guest_client, LOGIN_URL_UNFOLLOW_URL],
             ]
         for url, client, redirect in correct_pathes_to_redirect:
-            response = client.get(url)
-            self.assertRedirects(response, redirect)
+            self.assertRedirects(client.get(url), redirect)

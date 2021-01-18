@@ -18,14 +18,15 @@ GROUP2_SLUG = 'secondtestslug'
 USERNAME = 'pavel'
 USERNAME_TESTUSER = 'TestUser'
 USERNAME_FOR_SUBS = 'testuserforsubs'
+LOGIN = '/auth/login/'
 INDEX_URL = reverse('index')
-GROUP_URL = reverse('group', args={GROUP1_SLUG})
-PROFILE_URL = reverse('profile', args={USERNAME})
+GROUP_URL = reverse('group', args=[GROUP1_SLUG])
+PROFILE_URL = reverse('profile', args=[USERNAME])
 FOLLOW_INDEX_URL = reverse('follow_index')
-PROFILE_FOLLOW_PAVEL_URL = reverse('profile_follow', args={USERNAME})
-PROFILE_UNFOLLOW_PAVEL_URL = reverse('profile_unfollow', args={USERNAME})
-PROFILE_UNFOLLOW_URL = reverse('profile_unfollow', args={USERNAME})
-LOGIN_URL = '/auth/login/'
+PROFILE_FOLLOW_PAVEL_URL = reverse('profile_follow', args=[USERNAME])
+PROFILE_UNFOLLOW_PAVEL_URL = reverse('profile_unfollow', args=[USERNAME])
+PROFILE_UNFOLLOW_URL = reverse('profile_unfollow', args=[USERNAME])
+LOGIN_URL = LOGIN
 NEW_POST_URL = reverse('new_post')
 SECOND_INDEX_PAGE_URL = INDEX_URL + '?page=2'
 SMALL_GIF = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
@@ -58,18 +59,21 @@ class PostViewsTest(TestCase):
         Group.objects.create(title=GROUP2_TITLE,
                              description=GROUP2_DESCRIPTION,
                              slug=GROUP2_SLUG)
-        cls.POST_URL = reverse('post', kwargs={
-            'username': cls.post.author.username, 'post_id': cls.post.id})
-        cls.POST_EDIT_URL = reverse('post_edit', kwargs={
-            'username': cls.post.author.username,
-            'post_id': cls.post.id})
-        cls.ADD_COMMENT_URL = reverse('add_comment', kwargs={
-            'username': cls.post.author.username,
-            'post_id': cls.post.id})
+        cls.POST_URL = reverse('post', args=[cls.post.author.username,
+                                             cls.post.id])
+        cls.POST_EDIT_URL = reverse('post_edit',
+                                    args=[
+                                        cls.post.author.username,
+                                        cls.post.id])
+        cls.ADD_COMMENT_URL = reverse('add_comment',
+                                      args=[
+                                          cls.post.author.username,
+                                          cls.post.id])
         cls.author_testuser = User.objects.create_user(username='TestUser')
-        cls.POST_EDIT_TESTUSER_URL = reverse('post_edit', kwargs={
-            'username': cls.author_testuser.username,
-            'post_id': cls.post.id})
+        cls.POST_EDIT_TESTUSER_URL = reverse('post_edit',
+                                             args=[
+                                                 cls.author_testuser.username,
+                                                 cls.post.id])
         cls.LOGIN_URL_TESTUSER_URL = (f'{LOGIN_URL}?next='
                                       f'{cls.POST_EDIT_TESTUSER_URL}')
         cls.guest_client = Client()
@@ -90,20 +94,17 @@ class PostViewsTest(TestCase):
                 [INDEX_URL, self.guest_client],
                 [GROUP_URL, self.guest_client],
                 [PROFILE_URL, self.guest_client],
-                [INDEX_URL, self.authorized_client],
-                [GROUP_URL, self.authorized_client],
-                [PROFILE_URL, self.authorized_client],
-                [FOLLOW_INDEX_URL, self.authorized_client],
                 [self.POST_URL, self.guest_client],
-                [self.POST_URL, self.authorized_client],
+                [FOLLOW_INDEX_URL, self.authorized_client],
         ]
         for url, client in subscriptable_urls:
             with self.subTest():
                 response = client.get(url)
-                if 'post' in response.context:
-                    response_context = response.context['post']
-                else:
+                if 'page' in response.context and (
+                        len(response.context['page']) == 1):
                     response_context = response.context['page'][0]
+                else:
+                    response_context = response.context['post']
                 self.assertEqual(response_context, self.post)
 
     def test_first_page_contains_ten_posts(self):
@@ -154,26 +155,25 @@ class PostViewsTest(TestCase):
         """Тестирование того, что новая запись пользователя
         не появится в ленте"""
         response = self.authorized_client.get(FOLLOW_INDEX_URL)
-        actual_post = response.context['page']
-        self.assertNotEqual(actual_post, self.post)
+        self.assertFalse(response.context['page'])
 
     def test_authorized_user_can_subscribe(self):
-        """Тест на то, что только авторизированный
+        """Тест на то, что авторизированный
         пользователь может подписываться"""
         self.authorized_client.get(PROFILE_FOLLOW_PAVEL_URL)
         follow = Follow.objects.first()
-        follow_exists = Follow.objects.filter(author=self.post.author,
-                                              user=self.author_testuser)
-        self.assertTrue(follow_exists.exists())
+        self.assertTrue(
+            Follow.objects.filter(author=self.post.author,
+                                  user=self.author_testuser).exists())
         self.assertEqual(follow.user, self.author_testuser)
-        self.assertEqual(follow.author, self.post.author)
 
     def test_authorized_user_can_unsubscribe(self):
-        """Тест на то, что только авторизированный
+        """Тест на то, что авторизированный
                         пользователь может отписываться"""
         Follow.objects.create(user=self.author_testuser,
                               author=self.post.author)
         self.authorized_client.get(PROFILE_UNFOLLOW_PAVEL_URL)
-        follow_doesnt_exist = Follow.objects.filter(author=self.post.author,
-                                                    user=self.author_testuser)
-        self.assertFalse(follow_doesnt_exist.exists())
+        self.assertFalse(
+            Follow.objects.filter(
+                author=self.post.author,
+                user=self.author_testuser).exists())

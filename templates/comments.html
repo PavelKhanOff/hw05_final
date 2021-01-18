@@ -3,9 +3,9 @@
 {% if user.is_authenticated %}
 <div class="card my-4">
     {% if page == True %}
-    <form method="post" action="{% url 'add_comment' username=author post_id=post.id %}" ">
+    <form method="post" action="{% url 'add_comment' username=author post_id=post.id %}">
     {% else %}
-    <form method="post"">
+    <form method="post">
     {% endif %}
         {% csrf_token %}
         <h5 class="card-header">Добавить комментарий:</h5>
