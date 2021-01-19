@@ -91,7 +91,6 @@ class TaskCreateFormTests(TestCase):
             "text": "Текст новой записи",
             "group": self.group2.id,
             "image": uploaded,
-            'author': self.user_pavel
         }
         response = self.authorized_client.post(
             NEW_POST_URL,
@@ -100,8 +99,8 @@ class TaskCreateFormTests(TestCase):
         )
         post = Post.objects.exclude(id=self.post.id)[0]
         self.assertEqual(Post.objects.all().count(), 2)
+        self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.group.id, form_data['group'])
-        self.assertEqual(post.author, form_data['author'])
         self.assertTrue(post.image, f'posts/{uploaded.name}')
         self.assertRedirects(response, INDEX_URL)
 
@@ -174,7 +173,6 @@ class TaskCreateFormTests(TestCase):
         self.assertRedirects(response, self.POST_URL)
         self.assertEqual(Comment.objects.all().count(), 1)
         self.assertEqual(comment.post, self.post)
-        self.assertEqual(comment.author, self.post.author)
 
     def test_new_post_and_post_edit_pages_correct_fields(self):
         """Страница создания нового поста и
@@ -185,6 +183,6 @@ class TaskCreateFormTests(TestCase):
             ['text', forms.fields.CharField],
         ]
         for page, field in form_fields:
-            with self.subTest():
+            with self.subTest(page=page):
                 form_field = response.context['form'].fields.get(page)
                 self.assertIsInstance(form_field, field)

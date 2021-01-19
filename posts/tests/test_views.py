@@ -99,7 +99,7 @@ class PostViewsTest(TestCase):
             [FOLLOW_INDEX_URL, self.authorized_client],
         ]
         for url, client in subscriptable_urls:
-            with self.subTest():
+            with self.subTest(url=url):
                 response = client.get(url)
                 if 'page' in response.context:
                     response_context = response.context['page'][0]
@@ -155,18 +155,25 @@ class PostViewsTest(TestCase):
     def test_new_post_not_exists_unsubscribed_person(self):
         """Тестирование того, что новая запись пользователя
         не появится в ленте"""
-        response = self.authorized_client.get(FOLLOW_INDEX_URL)
-        self.assertEqual(len(response.context['page']), 0)
+        other_person = User.objects.create(
+            username='Другой человек'
+        )
+        authorized_person = Client()
+        authorized_person.force_login(other_person)
+        Follow.objects.create(
+            user=self.author_testuser,
+            author=self.post.author
+        )
+        response = authorized_person.get(FOLLOW_INDEX_URL)
+        self.assertNotIn(self.post, response.context['page'])
 
     def test_authorized_user_can_subscribe(self):
         """Тест на то, что авторизированный
         пользователь может подписываться"""
         self.authorized_client.get(PROFILE_FOLLOW_PAVEL_URL)
-        follow = Follow.objects.first()
         self.assertTrue(
             Follow.objects.filter(author=self.post.author,
                                   user=self.author_testuser).exists())
-        self.assertEqual(follow.user, self.author_testuser)
 
     def test_authorized_user_can_unsubscribe(self):
         """Тест на то, что авторизированный

@@ -62,7 +62,7 @@ class PostUrlTests(TestCase):
         cls.authorized_client.force_login(cls.user)
 
     def test_status_code_for_all_users_and_pages(self):
-        url_names = [
+        urls = [
             [INDEX_URL, self.guest_client, 200],
             [GROUP_URL, self.guest_client, 200],
             [PROFILE_URL, self.guest_client, 200],
@@ -81,14 +81,14 @@ class PostUrlTests(TestCase):
             [self.POST_EDIT_AUTHOR_URL, self.authorized_client, 200],
             [self.ADD_COMMENT_URL, self.authorized_client, 200],
         ]
-        for url, client, expected_status_code in url_names:
-            with self.subTest():
+        for url, client, expected_status_code in urls:
+            with self.subTest(url=url):
                 self.assertEqual(client.get(url).status_code,
                                  expected_status_code)
 
     def test_urls_correct_templates(self):
         """Проверка шаблона для адресов"""
-        correct_templates_and_adresses = [
+        templates = [
             [INDEX_URL, 'index.html'],
             [GROUP_URL, 'group.html'],
             [NEW_POST_URL, 'new_post.html'],
@@ -98,13 +98,13 @@ class PostUrlTests(TestCase):
             [self.POST_URL, 'post.html'],
             [PROFILE_URL, 'profile.html'],
         ]
-        for url, template in correct_templates_and_adresses:
-            with self.subTest():
+        for url, template in templates:
+            with self.subTest(url=url):
                 self.assertTemplateUsed(self.authorized_client.get(url),
                                         template)
 
     def test_post_edit_correct_redirect(self):
-        correct_pathes_to_redirect = [
+        redirects = [
             [self.POST_EDIT_AUTHOR_URL, self.guest_client,
              self.LOGIN_URL_TESTUSER_URL],
             [self.POST_EDIT_URL, self.authorized_client, self.POST_URL],
@@ -114,5 +114,6 @@ class PostUrlTests(TestCase):
             [PROFILE_FOLLOW_URL, self.guest_client, LOGIN_URL_FOLLOW_URL],
             [PROFILE_UNFOLLOW_URL, self.guest_client, LOGIN_URL_UNFOLLOW_URL],
             ]
-        for url, client, redirect in correct_pathes_to_redirect:
-            self.assertRedirects(client.get(url), redirect)
+        for url, client, redirect in redirects:
+            with self.subTest(url=url):
+                self.assertRedirects(client.get(url), redirect)
