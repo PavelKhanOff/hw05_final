@@ -4,7 +4,7 @@ import tempfile
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Follow, Group, Post, User
@@ -18,7 +18,7 @@ GROUP2_SLUG = 'secondtestslug'
 USERNAME = 'pavel'
 USERNAME_TESTUSER = 'TestUser'
 USERNAME_FOR_SUBS = 'testuserforsubs'
-LOGIN = '/auth/login/'
+LOGIN = reverse('login')
 INDEX_URL = reverse('index')
 GROUP_URL = reverse('group', args=[GROUP1_SLUG])
 PROFILE_URL = reverse('profile', args=[USERNAME])
@@ -37,6 +37,7 @@ SMALL_GIF = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
              b'\x0A\x00\x3B')
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class PostViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -91,18 +92,18 @@ class PostViewsTest(TestCase):
         Follow.objects.create(author=self.post.author,
                               user=self.author_testuser)
         subscriptable_urls = [
-                [INDEX_URL, self.guest_client],
-                [GROUP_URL, self.guest_client],
-                [PROFILE_URL, self.guest_client],
-                [self.POST_URL, self.guest_client],
-                [FOLLOW_INDEX_URL, self.authorized_client],
+            [INDEX_URL, self.guest_client],
+            [GROUP_URL, self.guest_client],
+            [PROFILE_URL, self.guest_client],
+            [self.POST_URL, self.guest_client],
+            [FOLLOW_INDEX_URL, self.authorized_client],
         ]
         for url, client in subscriptable_urls:
             with self.subTest():
                 response = client.get(url)
-                if 'page' in response.context and (
-                        len(response.context['page']) == 1):
+                if 'page' in response.context:
                     response_context = response.context['page'][0]
+                    self.assertEqual(len(response.context['page']), 1)
                 else:
                     response_context = response.context['post']
                 self.assertEqual(response_context, self.post)
@@ -155,7 +156,7 @@ class PostViewsTest(TestCase):
         """Тестирование того, что новая запись пользователя
         не появится в ленте"""
         response = self.authorized_client.get(FOLLOW_INDEX_URL)
-        self.assertFalse(response.context['page'])
+        self.assertEqual(len(response.context['page']), 0)
 
     def test_authorized_user_can_subscribe(self):
         """Тест на то, что авторизированный

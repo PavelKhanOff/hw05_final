@@ -17,10 +17,9 @@ GROUP2_SLUG = 'testslug2'
 GROUP2_TITLE = 'Тестовая группа2'
 GROUP2_DESCRIPTION = "Описание тестовой группы2"
 POST_TEXT = "Тестовый текст должен быть очень длинным"
-LOGIN = '/auth/login/'
 NEW_POST_URL = reverse("new_post")
-INDEX_URL = reverse("index")
-LOGIN_URL = LOGIN
+INDEX_URL = reverse('index')
+LOGIN_URL = reverse('login')
 NEW_POST_REDIRECT_URL = LOGIN_URL+'?next='+NEW_POST_URL
 SMALL_GIF = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
              b'\x01\x00\x80\x00\x00\x00\x00\x00'
@@ -28,6 +27,12 @@ SMALL_GIF = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
              b'\x00\x00\x00\x2C\x00\x00\x00\x00'
              b'\x02\x00\x01\x00\x00\x02\x02\x0C'
              b'\x0A\x00\x3B')
+SMALL_GIF2 = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
+              b'\x01\x00\x80\x00\x00\x00\x00\x00'
+              b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+              b'\x01\x00\x80\x00\x00\x00\x00\x00'
+              b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+              b'\x0A\x00\x3B')
 
 
 class TaskCreateFormTests(TestCase):
@@ -85,7 +90,8 @@ class TaskCreateFormTests(TestCase):
         form_data = {
             "text": "Текст новой записи",
             "group": self.group2.id,
-            "image": uploaded
+            "image": uploaded,
+            'author': self.user_pavel
         }
         response = self.authorized_client.post(
             NEW_POST_URL,
@@ -93,31 +99,66 @@ class TaskCreateFormTests(TestCase):
             follow=True
         )
         post = Post.objects.exclude(id=self.post.id)[0]
-        self.assertEqual(post.text, form_data['text'])
+        self.assertEqual(Post.objects.all().count(), 2)
         self.assertEqual(post.group.id, form_data['group'])
+        self.assertEqual(post.author, form_data['author'])
+        self.assertTrue(post.image, f'posts/{uploaded.name}')
         self.assertRedirects(response, INDEX_URL)
-    # Принял решение удалить проверку на то,
-    # что неавторизированные пользователи не могут создавать посты и их
-    # редактировать, потому что мы это проверяем в url, их редиректит
+
+    def test_create_post_not_authorized(self):
+        """Валидная форма не создает запись в Post
+        неавторизированным пользователя"""
+        post_count = Post.objects.count()
+        form_data = {
+            "text": "Текст новой записи",
+            "group": "",
+        }
+        response = self.guest_client.post(
+            NEW_POST_URL,
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, NEW_POST_REDIRECT_URL)
+        self.assertEqual(Post.objects.count(), post_count)
 
     def test_edit_post_authorized(self):
         """Редактируется нужный пост авторизированным пользователя"""
-        uploaded = SimpleUploadedFile(
+        uploaded2 = SimpleUploadedFile(
             name='small.gif',
-            content=SMALL_GIF,
+            content=SMALL_GIF2,
             content_type='image/gif'
         )
         form_data = {
             "text": "Текст новой записи",
             "group": self.group2.id,
-            "image": uploaded
+            "image": uploaded2
         }
-        response = self.authorized_client.post(self.POST_EDIT_URL,
-                                               data=form_data, follow=True)
+        response = self.authorized_client.post(
+            self.POST_EDIT_URL,
+            data=form_data, follow=True
+        )
         post_editing = response.context['post']
         self.assertEqual(post_editing.text, form_data['text'])
         self.assertEqual(post_editing.group.id, form_data['group'])
+        self.assertEqual(post_editing.image.name, f'posts/{uploaded2.name}')
         self.assertRedirects(response, self.POST_URL)
+
+    def test_edit_post_not_authorized(self):
+        """Не редактируется нужный пост неавторизированным пользователя"""
+        post_count = Post.objects.count()
+        form_data = {
+            "text": "Измененный текст новой записи",
+            "group": self.group.id,
+        }
+        response = self.guest_client.post(
+            self.POST_EDIT_URL,
+            data=form_data,
+            follow=True
+        )
+        post_after_editing = Post.objects.get(id=self.post.id)
+        self.assertRedirects(response, self.POST_REDIRECT_URL)
+        self.assertEqual(Post.objects.count(), post_count)
+        self.assertEqual(self.post, post_after_editing)
 
     def test_comment_post(self):
         """Авторизированный пользователь может комментировать посты"""
@@ -131,8 +172,9 @@ class TaskCreateFormTests(TestCase):
         comment = Comment.objects.first()
         self.assertEqual(comment.text, form_data['text'])
         self.assertRedirects(response, self.POST_URL)
-        self.assertEqual(self.post.comments.count(), 1)
+        self.assertEqual(Comment.objects.all().count(), 1)
         self.assertEqual(comment.post, self.post)
+        self.assertEqual(comment.author, self.post.author)
 
     def test_new_post_and_post_edit_pages_correct_fields(self):
         """Страница создания нового поста и

@@ -10,8 +10,7 @@ USERNAME = 'pavel'
 USERNAME_TESTUSER = 'TestUser'
 POST_PAVEL_TEXT = 'Тестовый супер текст'
 POST_TESTUSER_TEXT = 'Тестовый супер текст2'
-LOGIN = '/auth/login/'
-NOT_EXISTING_PAGE = '/not/existing/page'
+LOGIN = reverse('login')
 INDEX_URL = reverse('index')
 GROUP_URL = reverse('group', args=[GROUP_SLUG])
 PROFILE_URL = reverse('profile', args=[USERNAME])
@@ -19,7 +18,7 @@ FOLLOW_INDEX_URL = reverse('follow_index')
 PROFILE_FOLLOW_URL = reverse('profile_follow', args=[USERNAME])
 PROFILE_UNFOLLOW_URL = reverse('profile_unfollow', args=[USERNAME])
 LOGIN_URL = LOGIN
-NOT_EXISTING_PAGE_URL = NOT_EXISTING_PAGE
+NOT_EXISTING_PAGE_URL = '/not/existing/page'
 NEW_POST_URL = reverse('new_post')
 LOGIN_URL_NEW_URL = f'{LOGIN_URL}?next={NEW_POST_URL}'
 LOGIN_URL_FOLLOW_URL = f'{LOGIN_URL}?next={PROFILE_FOLLOW_URL}'
@@ -84,8 +83,8 @@ class PostUrlTests(TestCase):
         ]
         for url, client, expected_status_code in url_names:
             with self.subTest():
-                current_status_code = client.get(url).status_code
-                self.assertEqual(current_status_code, expected_status_code)
+                self.assertEqual(client.get(url).status_code,
+                                 expected_status_code)
 
     def test_urls_correct_templates(self):
         """Проверка шаблона для адресов"""

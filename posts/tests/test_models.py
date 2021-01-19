@@ -44,9 +44,9 @@ class PostModelTest(TestCase):
     def test_post_text(self):
         """Тест отображения __str__ для text"""
         text = self.post.text[:15]
-        self.assertEquals(text, self.post.text[:15])
+        self.assertEqual(text, self.post.text[:15])
 
     def test_title_group(self):
         """Тест отображения __str__ для group"""
         title_group = self.group.title
-        self.assertEquals(title_group, self.group.title)
+        self.assertEqual(title_group, self.group.title)
